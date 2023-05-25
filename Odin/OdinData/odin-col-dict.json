@@ -159,9 +159,9 @@
         "8": "Toeren/wandelen",
         "9": "Ander motief"
     },
-//    "leeftijd": {
-//        "99": "99 jaar of ouder"
-//    },
+    "leeftijd": {
+        "99": "99 jaar of ouder"
+    },
     "onbbez": {
         "0": "Geen onbetaalde bezigheid",
         "1": "Huisvrouw/huisman",
