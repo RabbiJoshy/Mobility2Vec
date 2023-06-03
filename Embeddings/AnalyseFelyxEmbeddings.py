@@ -11,16 +11,35 @@ import numpy as np
 import os
 from sklearn.decomposition import PCA
 from sklearn.metrics.pairwise import cosine_similarity
+import statistics
 
 model_name = 'All_balanced_deepPCinfo'
 APC = [str(PC) for PC in list(gpd.read_file('PublicGeoJsons/AmsPCs.json')['Postcode4'].unique())]
 combined = pd.read_pickle(os.path.join('Embeddings','models', model_name, 'predictions'))
 Odin = combined[combined.train == 1]
-Felyx = combined[combined.train == 1]
+Felyx = combined[combined.train == 0]
+Extrainfo = pd.read_pickle('Odin/OdinModellingData/Odin2019All')[list(set(pd.read_pickle('Odin/OdinModellingData/Odin2019All').columns).difference(set(Odin.columns)))]
+OdinExtra = Odin.join(Extrainfo)
 
-OdinExtra = Odin.join(pd.read_pickle('Odin/Odin2019' + oset)[list(set(pd.read_pickle('Odin/Odin2019All').columns).difference(set(Odin.columns)))])
+
+embFel = Felyx.sample(10000)
+embeddings = np.stack(embFel[['Emb' + str(x) for x in range(3)]].values)
+
+from scipy.spatial.distance import pdist, squareform
+# Compute cosine similarity matrix
+similarity_matrix = distance.euclidean(embeddings)
+distances = pdist(embeddings, metric='euclidean')
+dist_matrix = squareform(distances)
+
+dist_df = pd.DataFrame(dist_matrix, index=embFel.index, columns=embFel.index)
+most_similar_to_cat1 = dist_df[1665].sort_values(ascending=False)
+
+show = pd.concat([embFel.join(most_similar_to_cat1.iloc[:10], how = 'inner'),
+embFel.join(most_similar_to_cat1.iloc[-10:], how = 'inner')])
+plotshow(show, centers = False)
 
 
+gr = Felyx.drop(['khvm', 'choice', 'weekdag'], axis = 1 ).groupby('pred').mean()
 
 def readyshow(show, wrong = False, Ams = False, reduce = False, s = 0):
     if wrong == True:
@@ -46,8 +65,15 @@ def evensampletoshow(n):
             print(len(boys))
             show = pd.concat([show, boys.sample(min(n, len(boys)))])
     return show
-def plotshow(show, colorcol = 'choice'):
-    colormap = colormaps.get_cmap('Accent')#, len(show[colorcol].unique()))
+def centerdicmake(df):
+    centerdict = dict()
+    for i in df.choice.unique():
+        OO = df[df['choice'] == i]
+        points = OO[['Emb0','Emb1', 'Emb2']].values
+        centerdict[i] = [statistics.mean(i) for i in zip(*points)]
+    return centerdict
+def plotshow(show, colorcol = 'choice', centers = True):
+    colormap = colormaps.get_cmap('tab20')#, len(show[colorcol].unique()))
     color_dict = {category: colormap(i) for i, category in enumerate(show[colorcol].unique())}
     marker_dict = {1: 'x', 0:'o'}
 
@@ -55,25 +81,46 @@ def plotshow(show, colorcol = 'choice'):
     ax = fig.add_subplot(111, projection='3d')
     for i in show.train.unique():
         showt = show[show.train == i]
-        ax.scatter(showt['Emb0'], showt['Emb1'], showt['Emb2'], c=showt.choice.map(color_dict), marker=marker_dict[i])
+        if type(show[colorcol].iloc[0]) == str:
+            ax.scatter(showt['Emb0'], showt['Emb1'], showt['Emb2'], c=showt[colorcol].map(color_dict), marker=marker_dict[i])
+            for category, color in color_dict.items():
+                ax.plot([], [], 'o', color=color, label=category)
+            ax.legend()
+        else:
+            p = ax.scatter(showt['Emb0'], showt['Emb1'], showt['Emb2'], c=showt[colorcol],marker=marker_dict[i])
+            plt.colorbar(p)
+
+    if centers == True:
+        centerdict = centerdicmake(show)
+        for key in centerdict.keys():
+            if key in show[colorcol].unique():
+                ax.scatter(*centerdict[key], s = 200, c = color_dict[key])#, marker = key[0].lower())
+
     ax.set_xlabel('Emb0')
     ax.set_ylabel('Emb1')
     ax.set_zlabel('Emb2')
     ax.set_title(colorcol)
 
-    for category, color in color_dict.items():
-        ax.plot([], [], 'o', color=color, label=category)
-    ax.legend()
-    # plt.colorbar()
     plt.show()
 
-plotshow(readyshow(Odin, reduce = True, wrong = True, s = 500), 'pred')
-plotshow(readyshow(Felyx, s = 1500))
+plotshow(readyshow(Odin, reduce = True, wrong = True, s = 100), 'pred')
+plotshow(readyshow(Felyx, s = 150))
 plotshow(readyshow(Odin, reduce = True, wrong = True, s = 500, Ams =True), 'choice')
 plotshow(readyshow(Odin, reduce = True, wrong = True, s = 500, Ams =True), 'pred')
 plotshow(evensampletoshow(20), 'choice')
 
-corr = combined.drop(['khvm', 'choice', 'weekdag', 'pred'], axis = 1 ).corr()
+plotshow(readyshow(OdinExtra, reduce = False, wrong = True, s = 500), 'doel')
+plotshow(readyshow(OdinExtra, reduce = False, wrong = True, s = 500), 'ovstkaart')
+plotshow(readyshow(OdinExtra, reduce = False, wrong = False, s = 500), 'herkomst')
+plotshow(readyshow(OdinExtra, reduce = False, wrong = False, s = 500), 'prov')
+plotshow(readyshow(OdinExtra, reduce = False, wrong = False, s = 500), 'leeftijd')
+
+for i in Extrainfo.columns:
+    print(i, type(Extrainfo[i].iloc[0]))
+
+
+# Extrainfo['leeftijd'] = Extrainfo['leeftijd'].astype(int)
+corr = OdinExtra.drop(['khvm', 'choice', 'weekdag', 'pred'], axis = 1 ).corr()
 
 def pcgroupbyembeds(PC, Ams = True):
     import geopandas as gpd
@@ -82,7 +129,7 @@ def pcgroupbyembeds(PC, Ams = True):
         vertpcdf = vertpcdf[(vertpcdf.index.isin(APC))]
     return vertpcdf
 
-def showPCsinEmbedsace(s = 20, both = True, AmsV = True, AmsA = True):
+def showPCsinEmbedsace(s = 30, both = True, AmsV = True, AmsA = True):
     vertpcdf2 = pcgroupbyembeds('vertpc', AmsV)
     vertpcdf2 = vertpcdf2.sample(min(s, len(vertpcdf2)))
     fig = plt.figure(figsize=(8, 6))
@@ -105,7 +152,7 @@ def showPCsinEmbedsace(s = 20, both = True, AmsV = True, AmsA = True):
     ax.set_zlabel('Emb2')
     plt.show()
     return
-showPCsinEmbedsace(AmsV = False)
+showPCsinEmbedsace(AmsV = True)
 
 def analysepc2D(PC, s, Ams  =True):
     with open(os.path.join('Embeddings', 'models', model_name, 'embedding_dictionary'), 'rb') as f:
