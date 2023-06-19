@@ -13,33 +13,31 @@ from sklearn.decomposition import PCA
 from sklearn.metrics.pairwise import cosine_similarity
 import statistics
 
-model_name = 'All_balanced_deepPCinfo'
-APC = [str(PC) for PC in list(gpd.read_file('PublicGeoJsons/AmsPCs.json')['Postcode4'].unique())]
+model_name = 'All_notrein_deepPCinfo'
+model_name ='All_balanced_notrein_deepPCinfo'
+APC = [str(PC) for PC in list(gpd.read_file('PublicGeoJsons/AmsterdamPC4.geojson')['Postcode4'].unique())]
 combined = pd.read_pickle(os.path.join('Embeddings','models', model_name, 'predictions'))
 Odin = combined[combined.train == 1]
 Felyx = combined[combined.train == 0]
-Extrainfo = pd.read_pickle('Odin/OdinModellingData/Odin2019All')[list(set(pd.read_pickle('Odin/OdinModellingData/Odin2019All').columns).difference(set(Odin.columns)))]
+Extrainfo = pd.read_pickle('Odin/OdinSQL/Odin2018-2021All')[list(set(pd.read_pickle('Odin/OdinSQL/Odin2018-2021All').columns).difference(set(Odin.columns)))]
 OdinExtra = Odin.join(Extrainfo)
-
 
 embFel = Felyx.sample(10000)
 embeddings = np.stack(embFel[['Emb' + str(x) for x in range(3)]].values)
 
-from scipy.spatial.distance import pdist, squareform
-# Compute cosine similarity matrix
-similarity_matrix = distance.euclidean(embeddings)
-distances = pdist(embeddings, metric='euclidean')
-dist_matrix = squareform(distances)
+# from scipy.spatial.distance import pdist, squareform
+# # Compute cosine similarity matrix
+# similarity_matrix = distance.euclidean(embeddings)
+# distances = pdist(embeddings, metric='euclidean')
+# dist_matrix = squareform(distances)
 
-dist_df = pd.DataFrame(dist_matrix, index=embFel.index, columns=embFel.index)
-most_similar_to_cat1 = dist_df[1665].sort_values(ascending=False)
+# dist_df = pd.DataFrame(dist_matrix, index=embFel.index, columns=embFel.index)
+# most_similar_to_cat1 = dist_df[1665].sort_values(ascending=False)
 
-show = pd.concat([embFel.join(most_similar_to_cat1.iloc[:10], how = 'inner'),
-embFel.join(most_similar_to_cat1.iloc[-10:], how = 'inner')])
-plotshow(show, centers = False)
-
-
-gr = Felyx.drop(['khvm', 'choice', 'weekdag'], axis = 1 ).groupby('pred').mean()
+# show = pd.concat([embFel.join(most_similar_to_cat1.iloc[:10], how = 'inner'),
+# embFel.join(most_similar_to_cat1.iloc[-10:], how = 'inner')])
+# plotshow(show, centers = False)
+# gr = Felyx.drop(['khvm', 'choice', 'weekdag', 'description'], axis = 1 ).groupby('pred').mean()
 
 def readyshow(show, wrong = False, Ams = False, reduce = False, s = 0):
     if wrong == True:
@@ -103,24 +101,30 @@ def plotshow(show, colorcol = 'choice', centers = True):
 
     plt.show()
 
-plotshow(readyshow(Odin, reduce = True, wrong = True, s = 100), 'pred')
-plotshow(readyshow(Felyx, s = 150))
-plotshow(readyshow(Odin, reduce = True, wrong = True, s = 500, Ams =True), 'choice')
+plotshow(readyshow(Odin, reduce = True, wrong = True, s = 100), 'choice')
+plotshow(readyshow(Felyx, s = 250), 'choice')
+plotshow(readyshow(Odin, reduce = False, wrong = False, s = 800, Ams =True), 'choice')
+plotshow(readyshow(Odin, reduce = True, s = 500, Ams =True), 'choice')
 plotshow(readyshow(Odin, reduce = True, wrong = True, s = 500, Ams =True), 'pred')
-plotshow(evensampletoshow(20), 'choice')
+
+plotshow(readyshow(OdinExtra, reduce = False, s = 1500, Ams =True), 'hvm')
+plotshow(evensampletoshow(20), 'pred')
 
 plotshow(readyshow(OdinExtra, reduce = False, wrong = True, s = 500), 'doel')
 plotshow(readyshow(OdinExtra, reduce = False, wrong = True, s = 500), 'ovstkaart')
 plotshow(readyshow(OdinExtra, reduce = False, wrong = False, s = 500), 'herkomst')
 plotshow(readyshow(OdinExtra, reduce = False, wrong = False, s = 500), 'prov')
 plotshow(readyshow(OdinExtra, reduce = False, wrong = False, s = 500), 'leeftijd')
+plotshow(readyshow(OdinExtra, reduce = False, wrong = False, s = 500), 'geslacht')
 
 for i in Extrainfo.columns:
     print(i, type(Extrainfo[i].iloc[0]))
 
 
-# Extrainfo['leeftijd'] = Extrainfo['leeftijd'].astype(int)
-corr = OdinExtra.drop(['khvm', 'choice', 'weekdag', 'pred'], axis = 1 ).corr()
+Extrainfo['leeftijd'] = Extrainfo['leeftijd'].astype(int)
+corr = OdinExtra.drop(['doel', 'herkomst', 'hhauto', 'opleiding', 'hhgestinkg', 'hvm',
+       'geslacht', 'leeftijd', 'kmotiefv', 'oprijbewijsau', 'weekdag', 'maand', 'jaar', 'oprijbewijsmo', 'feestdag', 'hvm' , 'khvm', 'choice', 'pred'], axis = 1 ).corr()
+OdinExtra.columns
 
 def pcgroupbyembeds(PC, Ams = True):
     import geopandas as gpd
