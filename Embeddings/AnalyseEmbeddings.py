@@ -1,29 +1,28 @@
-import seaborn as sns
-from sklearn.manifold import TSNE
-import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
-from matplotlib import cm
-from matplotlib import colormaps
-import pandas as pd
-import geopandas as gpd
-import pickle
-import numpy as np
-import os
-from sklearn.decomposition import PCA
-from sklearn.metrics.pairwise import cosine_similarity
-import statistics
+from Embeddings.EmbeddingUtilities import *
+
+import json
+file = '/Users/joshuathomas/Desktop/2023-03-01_territories.json'
+with open(file, 'r') as f:
+  data = json.load(f)[0]
+p = data['polygons'][0]['coordinates']
+data.keys()
 
 model_name = 'All_notrein_deepPCinfo'
-model_name ='All_balanced_notrein_deepPCinfo'
-APC = [str(PC) for PC in list(gpd.read_file('PublicGeoJsons/AmsterdamPC4.geojson')['Postcode4'].unique())]
+model_name = 'All_balanced_notrein_deepPCinfo'
 combined = pd.read_pickle(os.path.join('Embeddings','models', model_name, 'predictions'))
 Odin = combined[combined.train == 1]
 Felyx = combined[combined.train == 0]
-Extrainfo = pd.read_pickle('Odin/OdinSQL/Odin2018-2021All')[list(set(pd.read_pickle('Odin/OdinSQL/Odin2018-2021All').columns).difference(set(Odin.columns)))]
+Extrainfo = pd.read_pickle('Odin/OdinWrangled/Odin2018-2021All')[list(set(pd.read_pickle('Odin/OdinWrangled/Odin2018-2021All').columns).difference(set(Odin.columns)))]
 OdinExtra = Odin.join(Extrainfo)
 
-embFel = Felyx.sample(10000)
-embeddings = np.stack(embFel[['Emb' + str(x) for x in range(3)]].values)
+# embFel = Felyx.sample(10000)
+# embeddings = np.stack(embFel[['Emb' + str(x) for x in range(3)]].values)
+
+plotboth(filter(Felyx, 1000, Ams = True), filter(Odin, 100, Ams = True), 'choice')
+
+e = pd.read_pickle('FelyxData/FelyxModellingData/felyxotpAmsterdam')[['prev_location','geometry', 'prev_time']]
+d = Felyx.join(e)
+plotjourneys('Personenauto - bestuurder', 5, d)
 
 # from scipy.spatial.distance import pdist, squareform
 # # Compute cosine similarity matrix
@@ -38,38 +37,6 @@ embeddings = np.stack(embFel[['Emb' + str(x) for x in range(3)]].values)
 # embFel.join(most_similar_to_cat1.iloc[-10:], how = 'inner')])
 # plotshow(show, centers = False)
 # gr = Felyx.drop(['khvm', 'choice', 'weekdag', 'description'], axis = 1 ).groupby('pred').mean()
-
-def readyshow(show, wrong = False, Ams = False, reduce = False, s = 0):
-    if wrong == True:
-        show = show[show.choice != show.pred]
-    if Ams == True:
-        show = show[show.aankpc.isin(APC)]
-    if reduce == True:
-        reduced = show.copy()
-        # redu = TSNE(n_components=3, learning_rate='auto', init='random', perplexity=3).fit_transform(reduced[['Emb'+str(x) for x in range(3)]].values)
-        redu = PCA(n_components=3).fit_transform(reduced[['Emb' + str(x) for x in range(3)]].values)
-        show[['Emb' + str(x) for x in range(3)]] = redu
-    if s > 0:
-        show = show.sample(s)
-
-    return show
-def evensampletoshow(n):
-    show = pd.DataFrame()
-    for i in combined.choice.unique():
-        for j in combined.train.unique():
-            print(i,j)
-        # print(combined[combined.choice == i])
-            boys = combined[(combined.choice == i) & (combined.train == j)]
-            print(len(boys))
-            show = pd.concat([show, boys.sample(min(n, len(boys)))])
-    return show
-def centerdicmake(df):
-    centerdict = dict()
-    for i in df.choice.unique():
-        OO = df[df['choice'] == i]
-        points = OO[['Emb0','Emb1', 'Emb2']].values
-        centerdict[i] = [statistics.mean(i) for i in zip(*points)]
-    return centerdict
 def plotshow(show, colorcol = 'choice', centers = True):
     colormap = colormaps.get_cmap('tab20')#, len(show[colorcol].unique()))
     color_dict = {category: colormap(i) for i, category in enumerate(show[colorcol].unique())}
@@ -101,24 +68,12 @@ def plotshow(show, colorcol = 'choice', centers = True):
 
     plt.show()
 
-plotshow(readyshow(Odin, reduce = True, wrong = True, s = 100), 'choice')
-plotshow(readyshow(Felyx, s = 250), 'choice')
-plotshow(readyshow(Odin, reduce = False, wrong = False, s = 800, Ams =True), 'choice')
-plotshow(readyshow(Odin, reduce = True, s = 500, Ams =True), 'choice')
-plotshow(readyshow(Odin, reduce = True, wrong = True, s = 500, Ams =True), 'pred')
-
-plotshow(readyshow(OdinExtra, reduce = False, s = 1500, Ams =True), 'hvm')
-plotshow(evensampletoshow(20), 'pred')
-
-plotshow(readyshow(OdinExtra, reduce = False, wrong = True, s = 500), 'doel')
+plotshow(filter(OdinExtra, reduce = False, wrong = True, s = 500), 'doel')
 plotshow(readyshow(OdinExtra, reduce = False, wrong = True, s = 500), 'ovstkaart')
 plotshow(readyshow(OdinExtra, reduce = False, wrong = False, s = 500), 'herkomst')
 plotshow(readyshow(OdinExtra, reduce = False, wrong = False, s = 500), 'prov')
 plotshow(readyshow(OdinExtra, reduce = False, wrong = False, s = 500), 'leeftijd')
 plotshow(readyshow(OdinExtra, reduce = False, wrong = False, s = 500), 'geslacht')
-
-for i in Extrainfo.columns:
-    print(i, type(Extrainfo[i].iloc[0]))
 
 
 Extrainfo['leeftijd'] = Extrainfo['leeftijd'].astype(int)

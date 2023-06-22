@@ -1,7 +1,7 @@
 import pandas as pd
 cols = ['vertpc', 'aankpc'] + ['geslacht', 'leeftijd', 'herkomst','doel', 'kmotiefv'] + ['hvm' ,'khvm'] + \
        ['vertmin','dag','jaar','maand', 'vertuur'] + ['verplid'] + ['weekdag', 'feestdag', 'oprijbewijsau'] + \
-       ['opleiding','hhgestinkg', 'oprijbewijsmo', 'hhauto']
+       ['opleiding','hhgestinkg', 'oprijbewijsmo', 'hhauto', 'oprijbewijsbr']
 from datetime import datetime
 o2019 = pd.read_pickle('/Users/joshuathomas/Desktop/Odin2019Full')
 o2018 = pd.read_pickle('/Users/joshuathomas/Desktop/Odin2018Full')
@@ -9,6 +9,7 @@ o2020 = pd.read_pickle('/Users/joshuathomas/Desktop/Odin2020Full')
 o2021 = pd.read_pickle('/Users/joshuathomas/Desktop/Odin2021Full')
 otp = pd.read_pickle('/Users/joshuathomas/Desktop/otp_allyears').drop('opid', axis = 1).set_index('verplid')
 
+o2021.columns
 
 # set(o2020.columns).difference(set(o2018.columns))
 combined = pd.concat([o2020[o2018.columns], o2019[o2018.columns], o2018, o2021])[cols]
@@ -20,6 +21,10 @@ combined = combined.set_index('verplid')
 combined = combined[combined.index.notnull()]
 combined.index = combined.index.astype(int)
 combined = combined[~combined.index.duplicated()]#.reset_index()
+
+# inv = combined[['oprijbewijsmo', 'oprijbewijsau', 'oprijbewijsbr', 'khvm']]
+# inv['has_license'] = inv['oprijbewijsmo'] | inv['oprijbewijsau']| inv['oprijbewijsbr']
+# inv.groupby(['khvm', 'has_license']).count()
 
 combotp = combined.join(otp)
 otp.index
@@ -87,3 +92,4 @@ FeaturesDict['PCInfo'] = pclist
 FeaturesDict['Weather'] = ['windspeed', 'temp', 'feelslike', 'precip', 'precipcover']
 with open('Features_Dictionary', 'w') as outfile:
     json.dump(FeaturesDict, outfile)
+
