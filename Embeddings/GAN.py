@@ -3,7 +3,8 @@ import torch
 from torch import nn
 from torch.autograd.variable import Variable
 from sklearn.preprocessing import StandardScaler
-
+from ModellingUtilities import *
+from sklearn.model_selection import train_test_split
 
 # Define generator
 class Generator(nn.Module):
@@ -17,8 +18,6 @@ class Generator(nn.Module):
 
     def forward(self, input):
         return self.main(input)
-
-
 # Define discriminator
 class Discriminator(nn.Module):
     def __init__(self):
@@ -32,24 +31,18 @@ class Discriminator(nn.Module):
 
     def forward(self, input):
         return self.main(input)
-
-
 def real_data_target(size):
     '''
     Tensor containing ones, with shape = size
     '''
     data = Variable(torch.ones(size, 1))
     return data
-
-
 def fake_data_target(size):
     '''
     Tensor containing zeros, with shape = size
     '''
     data = Variable(torch.zeros(size, 1))
     return data
-
-
 def train_discriminator(optimizer, real_data, fake_data):
     optimizer.zero_grad()
 
@@ -66,8 +59,6 @@ def train_discriminator(optimizer, real_data, fake_data):
     optimizer.step()
 
     return error_real + error_fake
-
-
 def train_generator(optimizer, fake_data):
     optimizer.zero_grad()
 
@@ -79,23 +70,35 @@ def train_generator(optimizer, fake_data):
 
     return error
 
-
 # Load your dataframe
-df = pd.read_pickle('FelyxData/FelyxModellingData/felyxotpAmsterdam').sample(1000)
-df.columns
-df = df[[ 'pt_duration', 'pt_distance','walk_duration', 'walk_distance',
-       'bike_duration', 'bike_distance', 'car_duration', 'car_distance','sin_time', 'cos_time']]
+df = pd.read_pickle('FelyxData/FelyxModellingData/felyxotpAADO').dropna()
+O = getOdin()
+Amenities = pd.read_pickle('SAO/OSM/Amenities/Felyx')
+OAmenities = pd.read_pickle('SAO/OSM/Amenities/AADO')
+OAmenitiesRed = reduce_df(OAmenities, 3)
+AmenitiesRed = reduce_df(Amenities, 3)
+df = df.join(AmenitiesRed)
+O = O.merge(OAmenitiesRed.reset_index(), left_on = 'aankpc', right_on = 'PC4')
+O['walk_duration'] = O['bike_duration']/3
+train_df, test_df = train_test_split(df, test_size = 0.5)
+Otrain_df, Otest_df = train_test_split(O, test_size = 0.5)
+VMA = pd.read_pickle('SAO/VMA_Wrangling/fullVMAADO')
 
-# Preprocess your data
-scaler = StandardScaler()
-df = pd.DataFrame(scaler.fit_transform(df), columns=df.columns)
-
-# Convert DataFrame into PyTorch tensor
-data = torch.tensor(df.values, dtype=torch.float32)
+def preprocess(df):
+    # Preprocess your data
+    scaler = StandardScaler()
+    df = pd.DataFrame(scaler.fit_transform(df), columns=df.columns)
+    df = df[['pt_duration', 'pt_distance', 'walk_duration',
+             'walk_distance', 'bike_duration', 'bike_distance',
+             'car_duration', 'car_distance', 'felyx_cost', 'pt_cost', 'car_cost', 'windspeed',
+             'temp', 'feelslike', 'precip', 'precipcover', 'PC0', 'PC1', 'PC2']]
+    # Convert DataFrame into PyTorch tensor
+    data = torch.tensor(df.values, dtype=torch.float32)
+    return data
 
 # Initialize generator and discriminator
-n_features = 10
-n_noise = 100
+n_features = 19
+n_noise = 10
 generator = Generator()
 discriminator = Discriminator()
 
@@ -106,8 +109,9 @@ criterion = nn.BCELoss()
 optimizer_g = torch.optim.Adam(generator.parameters(), lr=0.001)
 optimizer_d = torch.optim.Adam(discriminator.parameters(), lr=0.001)
 
+data = preprocess(train_df.dropna())
 # Training loop
-num_epochs = 1000
+num_epochs = 5000
 for epoch in range(num_epochs):
     real_data = data
 
@@ -141,3 +145,15 @@ fake_df = pd.DataFrame(scaler.inverse_transform(fake_df), columns=fake_df.column
 
 # Save the generated data to a CSV file
 fake_df.to_csv('fake_data.csv', index=False)
+
+
+
+predictions = discriminator(preprocess(df))
+sum(predictions.detach() > 0.5)/len(df)
+
+Opredictions = discriminator(preprocess(O_test))
+OBool = Opredictions > 0.5
+sum(OBool)
+O['pred'] = OBool
+
+grouped = O.groupby(['PC4', 'pred']).count()

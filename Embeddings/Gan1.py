@@ -4,16 +4,19 @@ import torch
 from torch import nn
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from torch.autograd.variable import Variable
+from ModellingUtilities import *
+df = pd.read_pickle('FelyxData/FelyxModellingData/felyxotpAADO').dropna()
+Amenities = pd.read_pickle('SAO/OSM/Amenities/Felyx')
+AmenitiesRed = reduce_df(Amenities, 3)
+df = df.join(AmenitiesRed)
+df = df[['pt_duration', 'pt_distance',  'walk_duration',
+       'walk_distance', 'bike_duration', 'bike_distance',
+       'car_duration', 'car_distance', 'felyx_cost', 'pt_cost', 'car_cost', 'windspeed',
+       'temp', 'feelslike', 'precip', 'precipcover', 'PC0', 'PC1', 'PC2', 'time_category']]
 
-df = pd.read_pickle('FelyxData/FelyxModellingData/felyxotpAmsterdam').sample(15000)
-df.columns
-df = df[[ 'pt_duration', 'pt_distance','walk_duration', 'walk_distance',
-       'bike_duration', 'bike_distance', 'car_duration', 'car_distance','sin_time', 'cos_time', 'aankpc', 'vertpc']]
-
-
-n_continuous = 10
-n_categorical = 2
-n_noise = 100
+n_continuous = 16
+n_categorical = 1
+n_noise = 1
 
 # Define the generator and discriminator
 class Generator(nn.Module):
@@ -48,8 +51,8 @@ scaler = StandardScaler()
 ohe = OneHotEncoder(sparse=False)
 
 # Assume that the first 10 columns are continuous and the last 2 are categorical
-df_continuous = df.iloc[:, :10]
-df_categorical = df.iloc[:, 10:]
+df_continuous = df.iloc[:, :16]
+df_categorical = df.iloc[:, 16:]
 
 # Convert categorical variables into one-hot encoding
 df_categorical_ohe = pd.DataFrame(ohe.fit_transform(df_categorical))
@@ -69,7 +72,7 @@ data = torch.tensor(df_processed.values, dtype=torch.float32)
 n_out_cont = len(df_continuous_scaled.columns)
 n_out_cat = len(df_categorical_ohe.columns)
 n_input = n_out_cont + n_out_cat
-n_noise = 100  # Set this to the desired noise dimension
+n_noise = 1  # Set this to the desired noise dimension
 
 # Create instances of the generator and the discriminator.
 generator = Generator(n_noise, n_out_cont, n_out_cat)
@@ -100,8 +103,6 @@ def train_discriminator(optimizer, real_data, fake_data):
     optimizer.step()
 
     return error_real + error_fake
-
-
 
 def train_generator(optimizer, fake_data):
     optimizer.zero_grad()

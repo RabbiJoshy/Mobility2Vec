@@ -22,27 +22,29 @@ df.Man = df.Man.div(df.Totaal, axis =0).mul(100)
 
 age = ['tot 15 jaar', '15 tot 25 jaar', '25 tot 45 jaar', '45 tot 65 jaar', '65 jaar en ouder']
 df[age] = df[age].div(df.Totaal, axis =0).mul(100)
-pca =  PCA(n_components=2).fit(df[age].values)
-redu = pca.transform(df[age].values)
-df[['Age' + str(x) for x in range(2)]] = redu
-df = df.drop(age, axis = 1)
+
+
+# pca =  PCA(n_components=2).fit(df[age].values)
+# redu = pca.transform(df[age].values)
+# df[['Age' + str(x) for x in range(2)]] = redu
+# df = df.drop(age, axis = 1)
 
 
 #Househoulds
 hh = ['Eenpersoons', 'Meerpersoons \nzonder kinderen', 'Eenouder', 'Tweeouder', 'Huishoudgrootte']
 df[hh] = df[hh].div(df['Totaal.1'], axis =0).mul(100)
-pca =  PCA(n_components=2).fit(df[hh].values)
-redu = pca.transform(df[hh].values)
-df[['hh' + str(x) for x in range(2)]] = redu
-df = df.drop(hh, axis = 1)
+# pca =  PCA(n_components=2).fit(df[hh].values)
+# redu = pca.transform(df[hh].values)
+# df[['hh' + str(x) for x in range(2)]] = redu
+# df = df.drop(hh, axis = 1)
 
 build_age = ['voor 1945','1945 tot 1965', '1965 tot 1975', '1975 tot 1985', '1985 tot 1995', '1995 tot 2005', '2005 tot 2015', '2015 en later']
 df[build_age]  = df[build_age].div(df['Totaal.2'], axis =0).mul(100)
 
-pca =  PCA(n_components=2).fit(df[build_age].values)
-redu = pca.transform(df[build_age].values)
-df[['build_age' + str(x) for x in range(2)]] = redu
-df = df.drop(build_age, axis = 1)
+# pca =  PCA(n_components=2).fit(df[build_age].values)
+# redu = pca.transform(df[build_age].values)
+# df[['build_age' + str(x) for x in range(2)]] = redu
+# df = df.drop(build_age, axis = 1)
 
 
 Im_Stat = ['Geboren in Nederland met een Nederlandse herkomst',
@@ -50,13 +52,20 @@ Im_Stat = ['Geboren in Nederland met een Nederlandse herkomst',
        'Geboren in Nederland met herkomst buiten Europa',
        'Geboren buiten Nederland met een Europese herkomst (excl. Nederland)',
        'Geboren buiten Nederland met een herkomst buiten Europa']
-pca =  PCA(n_components=2).fit(df[Im_Stat].values)
-redu = pca.transform(df[Im_Stat].values)
-df[['Immigration' + str(x) for x in range(2)]] = redu
-df = df.drop(Im_Stat, axis = 1)
+# pca =  PCA(n_components=2).fit(df[Im_Stat].values)
+# redu = pca.transform(df[Im_Stat].values)
+# df[['Immigration' + str(x) for x in range(2)]] = redu
+# df = df.drop(Im_Stat, axis = 1)
 df.columns
 
 df = df.join(density)
+
+df.to_pickle('PostcodeInfo/PC4_Clean')
+
+
+
+
+
 
 size = ['Totaal', 'Totaal.1', 'Totaal.2', 'Meergezins', 'density']
 pca =  PCA(n_components=2).fit(df[size].values)
