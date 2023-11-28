@@ -1,18 +1,72 @@
+import pandas as pd
+
 from Embeddings.EmbeddingUtilities import *
 
 import json
 file = '/Users/joshuathomas/Desktop/2023-03-01_territories.json'
+file = 'Misc/all.json'
 with open(file, 'r') as f:
-  data = json.load(f)[0]
+  data = json.load(f)[7]
 p = data['polygons'][0]['coordinates']
 data.keys()
+l = pd.DataFrame.from_dict(data)
+
+
+
+Odinr = pd.read_pickle('Embeddings/embs').sample(3000, random_state = 66)
+
+Odin = Odinr[Odinr.khvm != 'Te voet']
+fig = plt.figure(figsize=(8, 6))
+ax = fig.add_subplot(111, projection='3d')
+colormap = colormaps.get_cmap('Set1')  # , len(show[colorcol].unique()))
+color_dict = {category: colormap(i) for i, category in enumerate(Odin['khvm'].unique())}
+for i in Odin.khvm.unique():
+    showt = Odin[Odin.khvm == i]
+    ax.scatter(showt['Emb0'], showt['Emb1'], showt['Emb2'], c=showt['khvm'].map(color_dict))
+
+for category, color in color_dict.items():
+    ax.plot([], [], 'o', color=color, label=category)
+ax.legend()
+ax.set_xlabel('PC0')
+ax.set_ylabel('PC1')
+ax.set_zlabel('PC2')
+plt.show()
+
+Odinr['delta'] = Odinr['pt_duration'] - Odinr['car_duration']
+OdinC = pd.get_dummies(Odinr.drop(['oprijbewijsmo', 'oprijbewijsau',
+       'geslacht', 'leeftijd', 'herkomst', 'opleiding', 'doel', 'kmotiefv',  'vertpc', 'aankpc', 'hhsam', 'hhwelvg', 'hhefiets', 'ovstkaart'],
+                                  axis = 1)).corr()[['Emb0', 'Emb1', 'Emb2']]
+
+
+
+
+
+for i in Odinr['khvm'].unique():
+    Odin = Odinr[Odinr.khvm == i]
+    fig = plt.figure(figsize=(8, 6))
+    ax = fig.add_subplot(111, projection='3d')
+    colormap = colormaps.get_cmap('tab10')  # , len(show[colorcol].unique()))
+    color_dict = {category: colormap(i) for i, category in enumerate(Odin['khvm'].unique())}
+    for i in Odin.khvm.unique():
+        showt = Odin[Odin.khvm == i]
+        ax.scatter(showt['Emb0'], showt['Emb1'], showt['Emb2'], c=showt['khvm'].map(color_dict))
+
+    for category, color in color_dict.items():
+        ax.plot([], [], 'o', color=color, label=category)
+    ax.legend()
+    ax.set_xlabel('Emb0')
+    ax.set_ylabel('Emb1')
+    ax.set_zlabel('Emb2')
+    plt.show()
+
+
 
 model_name = 'All_notrein_deepPCinfo'
 model_name = 'All_balanced_notrein_deepPCinfo'
 combined = pd.read_pickle(os.path.join('Embeddings','models', model_name, 'predictions'))
 Odin = combined[combined.train == 1]
 Felyx = combined[combined.train == 0]
-Extrainfo = pd.read_pickle('Odin/OdinWrangled/Odin2018-2021All')[list(set(pd.read_pickle('Odin/OdinWrangled/Odin2018-2021All').columns).difference(set(Odin.columns)))]
+Extrainfo = pd.read_pickle('OdinData/OdinWrangled/Odin2018-2021All')[list(set(pd.read_pickle('Odindata/OdinWrangled/Odin2018-2021All').columns).difference(set(Odin.columns)))]
 OdinExtra = Odin.join(Extrainfo)
 
 # embFel = Felyx.sample(10000)
@@ -67,6 +121,12 @@ def plotshow(show, colorcol = 'choice', centers = True):
     ax.set_title(colorcol)
 
     plt.show()
+
+Odin2 = Odin[Odin.choice != 'Personenauto - passagier']
+Odin.choice.unique()
+plotshow(filter(Odin2, s = 1000, reduce = False))
+
+
 
 plotshow(filter(OdinExtra, reduce = False, wrong = True, s = 500), 'doel')
 plotshow(readyshow(OdinExtra, reduce = False, wrong = True, s = 500), 'ovstkaart')
