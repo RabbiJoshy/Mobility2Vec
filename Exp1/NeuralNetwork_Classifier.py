@@ -1,6 +1,6 @@
 from ModellingUtilities import *
 from fastai.tabular.all import *
-from Exp1.X import collate, collatebinary, age_cat
+from Exp1.XGBoost_classifier import collate, collatebinary, age_cat
 from collections import Counter
 
 def oversample_df(df):
