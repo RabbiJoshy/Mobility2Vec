@@ -5,25 +5,28 @@ from geopandas.tools import sjoin
 from geopandas.tools import overlay
 asa = pd.read_pickle('AmsterdamServiceArea')
 tl = gpd.read_file('PublicGeoJsons/TransitLines.json')
+lines = gpd.read_file('PublicGeoJsons/AmsLines.json')
 AP = gpd.read_file('PublicGeoJsons/AmsterdamPC4.geojson').set_index('Postcode4')
+AP2 = pd.read_pickle('PublicGeoJsons/AADO_PC4.geojson')
+
 AP.index = AP.index.astype(str)
-AP['centroid'] = AP['geometry'].centroid
-AP['centroid_within'] = AP['centroid'].apply(lambda centroid: asa.geometry.contains(centroid).any())
+# AP['centroid'] = AP['geometry'].centroid
+# AP['centroid_within'] = AP['centroid'].apply(lambda centroid: asa.geometry.contains(centroid).any())
+# AP2['centroid_within'] = AP2['centroid'].apply(lambda centroid: asa.geometry.contains(centroid).any())
 PCs = gpd.read_file('PublicGeoJsons/Amsbuurts.json')
 odin = pd.read_pickle('Odin/OdinWrangled/Odin2018-2021All')
 odinams = odin[(odin.aankpc.isin(AP.index)) &(odin.vertpc.isin(AP.index))]
+DIEMEN = pd.read_pickle('PublicGeoJsons/ADO_PC4.geojson')
+odinams2 = pd.read_pickle('Odin/OdinWrangled/Odin2018-2021AADO')
 
-DIEMEN = pd.read_pickle('PublicGeoJsons/DnA.geojson')
-
-
-def countfrac(df, AP, ServiceArea):
-    AP['centroid'] = AP['geometry'].centroid
-    AP['centroid_within'] = AP['centroid'].apply(lambda centroid: ServiceArea.geometry.contains(centroid).any())
+def countfrac(df, postcodes, ServiceArea):
+    postcodes['centroid'] = postcodes['geometry'].centroid
+    postcodes['centroid_within'] = postcodes['centroid'].apply(lambda centroid: ServiceArea.geometry.contains(centroid).any())
     fracs = dict()
     for i in ['aankpc', 'vertpc']:
         g = df.groupby(i).count().iloc[:, 0]
-        num = g[g.index.isin(AP[AP['centroid_within'] == True].index)].sum()
-        den = g[g.index.isin(AP[AP['centroid_within'] == False].index)].sum()
+        num = g[g.index.isin(postcodes[postcodes['centroid_within'] == True].index)].sum()
+        den = g[g.index.isin(postcodes[postcodes['centroid_within'] == False].index)].sum()
         fracs[i] = "{}/{}".format(num, den+num)#round(num/(den+num), 2)
     return fracs
 def plotjourneys(df, background, ServiceArea, modechoice = 'Personenauto - bestuurder', samples = 0,
@@ -35,6 +38,7 @@ def plotjourneys(df, background, ServiceArea, modechoice = 'Personenauto - bestu
     fig, ax = plt.subplots()
     DIEMEN.plot(ax = ax, facecolor = 'y', alpha = 0.1, linewidth = 0.1)
     if transit == True:
+        lines.plot(ax = ax, linewidth = 0.5)
         tl['Marker_Size'] = tl['Modaliteit'].map({'Tram': 0.25, 'Metro': 5})
         tl['Color'] = tl['Modaliteit'].map({'Tram': 'y', 'Metro': 'y'})
         tl.plot(ax=ax, c=tl['Color'], markersize=tl['Marker_Size'], legend=True)
@@ -43,15 +47,15 @@ def plotjourneys(df, background, ServiceArea, modechoice = 'Personenauto - bestu
     # ax.set_aspect('equal')
     if samples > 0:
         best = best.sample(min(len(best), samples))
-    fracdict = countfrac(best, AP, ServiceArea)
+    fracdict = countfrac(best, background, ServiceArea)
     asize = best.groupby('aankpc').count().iloc[:, 0]
     vsize = best.groupby('vertpc').count().iloc[:, 0]
-    x2 = AP.loc[best['aankpc']].geometry.centroid.x
-    y2 = AP.loc[best['aankpc']].geometry.centroid.y
-    x1 = AP.loc[best['vertpc']].geometry.centroid.x
-    y1 = AP.loc[best['vertpc']].geometry.centroid.y
-    ax.scatter(x1, y1, c = 'r', s = vsize[best['vertpc']])
-    ax.scatter(x2, y2, c='g', s=asize[best['aankpc']])
+    x2 = background.loc[best['aankpc']].geometry.centroid.x
+    y2 = background.loc[best['aankpc']].geometry.centroid.y
+    x1 = background.loc[best['vertpc']].geometry.centroid.x
+    y1 = background.loc[best['vertpc']].geometry.centroid.y
+    # ax.scatter(x1, y1, c = 'r', s = vsize[best['vertpc']])
+    # ax.scatter(x2, y2, c='g', s=asize[best['aankpc']])
     ax.set_title(str(fracdict))
 
     return
@@ -70,7 +74,48 @@ def Buffer(asa, b = 50):
 asa_buffered = Buffer(asa, 250)
 # asa_buffered.plot()
 # plotjourneys(outside, AP, asa_buffered, samples =150)
-plotjourneys(odinams, AP, asa_buffered, samples =700, transit = True)
+plotjourneys(odinams, AP, asa_buffered, transit = True)
+plotjourneys(odinams2, AP2, asa_buffered, transit = True)
+
+
+def plot_modeshare(df):
+# Convert the grouped data to a dictionary
+    grouped = df.groupby(['aankpc', 'khvm']).size().unstack(fill_value=0)
+
+    # Convert the grouped data to a dictionary
+    result_dict = grouped.to_dict(orient='index')
+    dict_df = pd.DataFrame.from_dict(result_dict, orient='index')
+
+    # Set the index of the DataFrame to the larger set of 'aankpcs'
+    larger_set = set(AP2.index)  # Larger set of 'aankpcs'
+    dict_df = dict_df.reindex(larger_set, fill_value=0.01)
+    merged_df = AP2.merge(dict_df, left_index=True, right_index=True, how='left')
+
+    merged_df = merged_df.iloc[:10, :]
+    total_cols = result_dict['1011'].keys()
+    merged_df['proportions'] = merged_df[total_cols].div(merged_df[total_cols].sum(axis=1), axis=0).values.tolist()
+
+    bounds = merged_df.geometry.bounds
+    min_x = bounds['minx'].min()
+    min_y = bounds['miny'].min()#52.225#
+    max_x = bounds['maxx'].max()
+    max_y = bounds['maxy'].max()#52.45
+
+    fig = plt.figure()
+    ax_map = fig.add_axes([0, 0, 1, 1])
+    merged_df.plot(ax=ax_map, facecolor = 'None')
+    ax_map.set_xlim([min_x, max_x])
+    ax_map.set_ylim([min_y, max_y])
+
+    for _, row in merged_df.iterrows():
+        centroid = row['geometry'].centroid
+        pie_data = row['proportions']
+        lat, lon = centroid.x, centroid.y
+        ax_bar = fig.add_axes([((lat - min_x +0.0001)/ (max_x-min_x))-.025, ((lon - min_y +0.0001)/ (max_y-min_y))-0.025, 0.05, 0.05])
+        ax_bar.pie(pie_data, radius = 0.5)
+        ax_bar.set_axis_off()
+plot_modeshare(odinams2)
+
 
 # def hypeodin():
 # def hypeodin():
